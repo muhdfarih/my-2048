@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#faf8ef">
+<link rel="manifest" href="manifest.webmanifest">
+<title>My 2048</title>
+<style>
+:root{--bg:#faf8ef;--ink:#776e65;--muted:#9b9188;--board:#bbada0;--empty:#cdc1b4;--panel:#eee4da;--accent:#8f7a66}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;justify-content:center;min-height:100vh;padding:18px 12px 32px}
+.app{width:min(100%,520px)}header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 0 14px}h1{font-size:clamp(40px,11vw,62px);line-height:1;margin:0;font-weight:800;letter-spacing:-3px}.scores{display:flex;gap:7px}.scorebox{background:#bbada0;color:white;border-radius:8px;padding:7px 12px;min-width:82px;text-align:center}.scorebox small{display:block;font-size:11px;opacity:.85;font-weight:700}.scorebox strong{font-size:20px;font-variant-numeric:tabular-nums}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.btn,select,input{font:inherit}.btn{border:0;border-radius:7px;background:#8f7a66;color:white;padding:10px 13px;font-weight:700;cursor:pointer}.btn.secondary{background:#eee4da;color:#776e65}.btn:disabled{opacity:.4;cursor:not-allowed}.btn.small{padding:7px 10px;font-size:13px}.status{margin:8px 0 12px;display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:13px}.pill{background:#eee4da;border-radius:20px;padding:5px 10px;font-weight:700}
+.board{background:var(--board);padding:10px;border-radius:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:9px;aspect-ratio:1;touch-action:none;user-select:none}
+.cell{border-radius:6px;background:rgba(238,228,218,.35);display:flex;align-items:center;justify-content:center;min-width:0;font-size:clamp(20px,7vw,38px);font-weight:800;letter-spacing:-1px;overflow:hidden;font-variant-numeric:tabular-nums}
+.v2{background:#eee4da}.v4{background:#ede0c8}.v8{background:#f2b179;color:#fff}.v16{background:#f59563;color:#fff}.v32{background:#f67c5f;color:#fff}.v64{background:#f65e3b;color:#fff}.v128{background:#edcf72;color:#fff;font-size:clamp(18px,6vw,32px)}.v256{background:#edcc61;color:#fff;font-size:clamp(18px,6vw,32px)}.v512{background:#edc850;color:#fff;font-size:clamp(18px,6vw,32px)}.v1024,.v2048{background:#edc53f;color:#fff;font-size:clamp(16px,5vw,27px)}.vbig{background:#3c3a32;color:#fff;font-size:clamp(14px,4.5vw,24px)}
+.panel{background:#fffaf2;border:1px solid #e6ddd2;border-radius:10px;padding:13px;margin-top:14px}.panel h2{font-size:18px;margin:0 0 10px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.field{display:flex;flex-direction:column;gap:4px;margin:8px 0;font-size:13px;font-weight:700}.field input,.field select{width:100%;border:1px solid #d8cfc5;border-radius:7px;padding:9px;background:white;color:var(--ink)}.editor{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.editor input,.editor select{width:100%;min-width:0;text-align:center;padding:10px 2px;border:1px solid #d8cfc5;border-radius:6px;font-size:14px;font-weight:700;color:var(--ink);background:#fff}.hint{font-size:12px;color:#8b8178;line-height:1.45}.hidden{display:none!important}.footer{font-size:12px;color:#9b9188;margin:12px 2px}.toast{min-height:22px;color:#8f5c35;font-size:13px;margin-top:7px}
+@media(min-width:520px){body{padding-top:28px}.board{gap:10px;padding:11px}.cell{font-size:40px}}
+</style>
+</head>
+<body><main class="app">
+<header><h1>2048</h1><div class="scores"><div class="scorebox"><small>SCORE</small><strong id="score">0</strong></div><div class="scorebox"><small>BEST</small><strong id="best">0</strong></div></div></header>
+<div class="toolbar"><button class="btn" id="newBtn">New game</button><button class="btn secondary" id="undoBtn">Undo · 0</button><button class="btn secondary" id="exportBtn">Export save</button><button class="btn secondary" id="importBtn">Import save</button><input id="importFile" type="file" accept="application/json" class="hidden"></div>
+<div class="status"><span class="pill" id="modeLabel">Classic</span><span id="movesLabel">Moves: 0</span><span id="tileLabel">Best tile: 2</span></div>
+<div class="board" id="board" aria-label="2048 game board"></div>
+<div class="toast" id="toast" role="status"></div>
+<section class="panel" id="setup">
+<h2>Start a game</h2>
+<div class="row"><label class="field">Game mode<select id="mode"><option value="classic">Classic · no undo</option><option value="one">One Undo</option><option value="two">Two Undos</option><option value="custom">Custom board</option></select></label></div>
+<div id="customArea" class="hidden">
+<div class="row"><label class="field">Custom starting score<input id="startScore" type="number" min="0" step="1" value="0" inputmode="numeric"></label></div>
+<p class="hint">Choose 0 for an empty cell, or a valid 2048 tile: 2, 4, 8, 16 … up to 65,536. Values such as 3 or 5 are not allowed. Repeated tile values ARE allowed, just like normal 2048. The top-left cell here is the top-left game cell.</p>
+<div class="editor" id="editor"></div>
+<div class="row" style="margin-top:9px"><button class="btn secondary small" id="clearBoard">Clear board</button><button class="btn secondary small" id="sampleBoard">Load example</button></div>
+<div class="row"><label class="field">Undo allowance<select id="customUndos"><option value="0">0 undos</option><option value="1">1 undo</option><option value="2">2 undos</option></select></label><label class="field">Preset name<input id="presetName" placeholder="e.g. 65536 challenge"></label></div>
+<div class="row"><button class="btn secondary small" id="savePreset">Save preset</button><select id="presets" aria-label="Saved presets"><option value="">Choose preset…</option></select><button class="btn secondary small" id="loadPreset">Load</button></div>
+</div>
+<div class="row"><button class="btn" id="startBtn">Start game</button><button class="btn secondary" id="resumeBtn">Resume saved game</button></div>
+<p class="hint">Choose a mode and start. Mode, board and undo allowance are locked for the run. Custom-board runs are labelled separately from standard runs.</p>
+</section>
+<section class="panel"><h2>Run history</h2><div id="history" class="hint">No completed runs yet.</div><div class="row" style="margin-top:8px"><button class="btn secondary small" id="clearHistory">Clear history</button></div></section>
+<p class="footer">Keyboard: arrow keys or WASD. Mobile: swipe. Game state is saved on this device in this browser.</p>
+</main>
+<script>
+const $=id=>document.getElementById(id), KEY='my2048-v1';
+const blank=()=>Array(16).fill(0);
+let game=null, best=0, history=[], presets=[];
+function validTile(n){return Number.isSafeInteger(n)&&n>=0&&n<=65536&&(n===0||(n>0&&Number.isInteger(Math.log2(n))))}
+function fmt(n){return Number(n||0).toLocaleString('en-US')}
+function tileClass(v){if(!v)return '';if(v<=2048)return 'v'+v;return 'vbig'}
+function notify(s){$('toast').textContent=s;clearTimeout(notify.t);notify.t=setTimeout(()=>$('toast').textContent='',3500)}
+function randomTile(b){let e=[];b.forEach((v,i)=>{if(!v)e.push(i)});if(!e.length)return b;let i=e[Math.floor(Math.random()*e.length)];b[i]=Math.random()<.9?2:4;return b}
+function startStandard(mode){let b=blank();randomTile(b);randomTile(b);startRun({board:b,score:0,mode,undoMax:mode==='one'?1:mode==='two'?2:0,undosLeft:mode==='one'?1:mode==='two'?2:0,moves:0,stack:[],over:false,started:Date.now(),custom:false})}
+function startRun(g){game=g;save();render();$('setup').classList.add('hidden');notify('New '+(g.custom?'custom':'')+' game started.')}
+function startCustom(){let b=[...document.querySelectorAll('#editor select')].map(x=>Number(x.value||0));if(b.some(x=>!validTile(x))){notify('Choose only 0 or powers of 2 up to 65,536.');return}let mode='custom',u=+$('customUndos').value;startRun({board:b,score:Math.max(0,Math.floor(+$('startScore').value||0)),mode,undoMax:u,undosLeft:u,moves:0,stack:[],over:false,started:Date.now(),custom:true})}
+function clone(g){return JSON.parse(JSON.stringify(g))}
+function save(){if(!game)return;localStorage.setItem(KEY,JSON.stringify({game,best,history,presets}))}
+function load(){try{let d=JSON.parse(localStorage.getItem(KEY)||'{}');best=d.best||0;history=d.history||[];presets=d.presets||[];if(d.game&&Array.isArray(d.game.board)&&d.game.board.length===16)game=d.game}catch(e){notify('Could not read the saved game.')}refreshPresets();renderHistory();render()}
+function slideLine(line){let a=line.filter(Boolean),out=[],gain=0;for(let i=0;i<a.length;i++){if(a[i]===a[i+1]){let v=a[i]*2;out.push(v);gain+=v;i++}else out.push(a[i])}while(out.length<4)out.push(0);return {line:out,gain}}
+function move(dir){if(!game||game.over)return;let old=clone(game),b=game.board.slice(),gain=0;
+for(let k=0;k<4;k++){let ids=[];for(let j=0;j<4;j++){let r,c;if(dir==='left'){r=k;c=j}else if(dir==='right'){r=k;c=3-j}else if(dir==='up'){r=j;c=k}else{r=3-j;c=k}ids.push(r*4+c)}let res=slideLine(ids.map(i=>b[i]));gain+=res.gain;ids.forEach((id,j)=>b[id]=res.line[j])}
+if(b.every((v,i)=>v===game.board[i]))return;
+game.stack.push({board:old.board,score:old.score,moves:old.moves,over:old.over});if(game.stack.length>50)game.stack.shift();
+game.board=b;game.score+=gain;game.moves++;randomTile(game.board);best=Math.max(best,game.score);checkOver();save();render()}
+function checkOver(){if(game.board.some(v=>!v))return;for(let r=0;r<4;r++)for(let c=0;c<4;c++){let i=r*4+c;if(c<3&&game.board[i]===game.board[i+1])return;if(r<3&&game.board[i]===game.board[i+4])return}game.over=true;finishRun()}
+function finishRun(){history.unshift({score:game.score,bestTile:Math.max(...game.board),moves:game.moves,mode:game.custom?'Custom board':game.mode,when:new Date().toLocaleString()});history=history.slice(0,30);save();renderHistory();notify('No more moves. Game over.')}
+function undo(){if(!game||game.over||!game.undosLeft||!game.stack.length)return;let s=game.stack.pop();game.board=s.board;game.score=s.score;game.moves=s.moves;game.undosLeft--;save();render();notify('Undo used. '+game.undosLeft+' remaining.')}
+function render(){let b=$('board');b.innerHTML='';if(game){game.board.forEach(v=>{let d=document.createElement('div');d.className='cell '+tileClass(v);d.textContent=v?String(v):'';b.appendChild(d)});$('score').textContent=fmt(game.score);$('modeLabel').textContent=(game.custom?'Custom · ':'')+({classic:'Classic',one:'One Undo',two:'Two Undos',custom:'Custom'}[game.mode]||game.mode);$('movesLabel').textContent='Moves: '+game.moves;$('tileLabel').textContent='Best tile: '+fmt(Math.max(...game.board));$('undoBtn').textContent='Undo · '+game.undosLeft;$('undoBtn').disabled=!game.undosLeft||!game.stack.length||game.over;$('best').textContent=fmt(best);$('resumeBtn').disabled=false}else{$('score').textContent='0';$('best').textContent=fmt(best);$('undoBtn').disabled=true;$('resumeBtn').disabled=true}}
+function renderHistory(){let h=$('history');if(!history.length){h.textContent='No completed runs yet.';return}h.innerHTML=history.map(x=>`<div style="padding:7px 0;border-bottom:1px solid #eee4da"><b>${fmt(x.score)}</b> · ${x.mode} · best tile ${fmt(x.bestTile)} · ${x.moves} moves<br><span style="color:#aaa">${x.when}</span></div>`).join('')}
+function buildEditor(vals=blank()){$('editor').innerHTML='';const options=[0,...Array.from({length:16},(_,i)=>2**(i+1))];vals.forEach((v,i)=>{let x=document.createElement('select');x.className='tile-select';x.setAttribute('aria-label','Row '+(Math.floor(i/4)+1)+' column '+(i%4+1));options.forEach(n=>{let o=document.createElement('option');o.value=String(n);o.textContent=n===0?'—':fmt(n);x.appendChild(o)});x.value=String(v);$('editor').appendChild(x)})}
+function refreshPresets(){$('presets').innerHTML='<option value="">Choose preset…</option>'+presets.map((p,i)=>`<option value="${i}">${p.name.replace(/[<>&"]/g,'')}</option>`).join('')}
+$('mode').onchange=()=>{$('customArea').classList.toggle('hidden',$('mode').value!=='custom')};
+$('startBtn').onclick=()=>{if(game&&!game.over&&!confirm('Start a new game? Your current run will be replaced, but its latest state is saved only until then.'))return;if($('mode').value==='custom')startCustom();else startStandard($('mode').value)};
+$('newBtn').onclick=()=>{$('setup').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})};
+$('undoBtn').onclick=undo;
+$('resumeBtn').onclick=()=>{let d=JSON.parse(localStorage.getItem(KEY)||'{}');if(d.game){game=d.game;render();$('setup').classList.add('hidden');notify('Saved game resumed.')}};
+$('clearBoard').onclick=()=>buildEditor();
+$('sampleBoard').onclick=()=>buildEditor([4096,2048,4,0,16384,512,8,2,32768,128,16,4,65536,64,32,8]);
+$('savePreset').onclick=()=>{let b=[...document.querySelectorAll('#editor select')].map(x=>Number(x.value||0));if(b.some(x=>!validTile(x))){notify('Choose only 0 or powers of 2 up to 65,536.');return}let name=$('presetName').value.trim()||'My board '+(presets.length+1);presets.push({name,board:b,score:Math.max(0,+$('startScore').value||0),undos:+$('customUndos').value});save();refreshPresets();notify('Preset saved.')};
+$('loadPreset').onclick=()=>{let i=+$('presets').value;if(!Number.isInteger(i)||!presets[i])return;let p=presets[i];buildEditor(p.board);$('startScore').value=p.score;$('customUndos').value=p.undos;$('presetName').value=p.name;notify('Preset loaded into editor.')};
+$('exportBtn').onclick=()=>{let data=localStorage.getItem(KEY)||'{}',a=document.createElement('a'),url=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.href=url;a.download='my-2048-save.json';a.click();URL.revokeObjectURL(url)};
+$('importBtn').onclick=()=>$('importFile').click();
+$('importFile').onchange=async e=>{try{let d=JSON.parse(await e.target.files[0].text());if(d.game&&Array.isArray(d.game.board)&&d.game.board.length===16){localStorage.setItem(KEY,JSON.stringify(d));load();notify('Save imported.')}else notify('That file does not look like a valid game save.')}catch(err){notify('Could not import that file.')}e.target.value=''};
+$('clearHistory').onclick=()=>{if(confirm('Clear completed game history?')){history=[];save();renderHistory()}};
+document.addEventListener('keydown',e=>{let m={ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right',ArrowUp:'up',w:'up',ArrowDown:'down',s:'down'};if(m[e.key]){e.preventDefault();move(m[e.key])}});
+let sx=0,sy=0,board=$('board');board.addEventListener('touchstart',e=>{let t=e.changedTouches[0];sx=t.clientX;sy=t.clientY},{passive:true});board.addEventListener('touchend',e=>{let t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;if(Math.max(Math.abs(dx),Math.abs(dy))<25)return;if(Math.abs(dx)>Math.abs(dy))move(dx>0?'right':'left');else move(dy>0?'down':'up')},{passive:true});
+buildEditor();load();
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+</script></body></html>
